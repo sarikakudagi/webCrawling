@@ -9,122 +9,144 @@ import java.util.Queue;
 import java.util.regex.*;
 import java.util.Scanner;
 
+public class ReadFromUrl {
 
+	private static Queue<String> urlsFound = new LinkedList<String>();
+	// Maintain a HashMap to keep track on all the URL's visited so we do not
+	// crawl multiple times
+	private static HashMap<String, Boolean> urlsVisited = new HashMap<String, Boolean>();
+	private static ArrayList<String> emailsFound = new ArrayList<String>();
+	private static String domainName;
+	private static int maxPageDepth = 2;
 
-
-public class ReadFromURL {
-	private static Queue<String> allURLs = new LinkedList<String>();
-	//Maintain a HashMap to keep track on all the URL's visited so we do not crawl multiple times 
-	private static HashMap<String,Boolean> visited = new HashMap<String,Boolean>();
-	private static ArrayList<String> emailIdFound = new ArrayList<String>();
-	private static String domainname;
-	
-	private static void crawling(String url) throws Exception{
+	// finds and stores URL's, email ID's found while crawling
+	private static void findUrlsAndEmailsOnSite(String url) throws Exception {
 		URL oracle = new URL(url);
-		try{
-			InputStreamReader input =  new InputStreamReader(oracle.openStream());
+		try {
+			InputStreamReader input = new InputStreamReader(oracle.openStream());
 			BufferedReader in = new BufferedReader(input);
-			//Pattern to look for URL. If any URL exist(in same domain), add it to allURLs queue
-	        final Pattern urlPattern = Pattern.compile(
-	                "(?:^|[\\W])((ht|f)tp(s?):\\/\\/|www\\.)"
-	                        + "(([\\w\\-]+\\.){1,}?([\\w\\-.~]+\\/?)*"
-	                        + "[\\p{Alnum}.,%_=?&#\\-+()\\[\\]\\*$~@!:/{};']*)",
-	                Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL);
-        
-	        String inputLine;
-	        while ((inputLine = in.readLine()) != null){
-        	//Pattern to match an email address
-             Matcher m = Pattern.compile("[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+").matcher(inputLine);
-            
-             while (m.find()) {
-                 if(!emailIdFound.contains(m.group()))
-                	 emailIdFound.add(m.group());
-             	}
-	             Matcher matcher = urlPattern.matcher(inputLine);
-	             while (matcher.find()) {
-	            	 String urlFound = inputLine.substring(matcher.start(1),matcher.end(0));
-	            	 //discard any URLs with .png, .jpg or .svg file extension
-	            	 if(getDomainName(urlFound).equals(domainname) && !visited.containsKey(urlFound) && !urlFound.contains(".jpg") && !urlFound.contains(".ico") && !urlFound.contains(".png") && !urlFound.contains(".svg")){
-	                    allURLs.add(urlFound);
-	                    visited.put(urlFound, false);
-	            	 }
-	             }
-	        }
-	        in.close();
-			}catch(IOException e){
+			// Pattern to look for URL. If any Urls exist(in same domain), add
+			// it to urlsFound queue
+			final Pattern urlPattern = Pattern
+					.compile(
+							"(?:^|[\\W])((ht|f)tp(s?):\\/\\/|www\\.)"
+									+ "(([\\w\\-]+\\.){1,}?([\\w\\-.~]+\\/?)*"
+									+ "[\\p{Alnum}.,%_=?&#\\-+()\\[\\]\\*$~@!:/{};']*)",
+							Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
+									| Pattern.DOTALL);
+
+			String inputLine;
+			while ((inputLine = in.readLine()) != null) {
+				// Pattern to match an email address
+				Matcher emailMatcher = Pattern.compile(
+						"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+")
+						.matcher(inputLine);
+
+				while (emailMatcher.find()) {
+					if (!emailsFound.contains(emailMatcher.group()))
+						emailsFound.add(emailMatcher.group());
+				}
+				Matcher UrlMatcher = urlPattern.matcher(inputLine);
+				while (UrlMatcher.find()) {
+					String urlFound = inputLine.substring(UrlMatcher.start(1),
+							UrlMatcher.end(0));
+					// discard any URLs with .png, .jpg, .css or .svg file
+					// extension
+					if (getDomainName(urlFound).equals(domainName)
+							&& !urlsVisited.containsKey(urlFound)
+							&& !urlFound.contains(".jpg")
+							&& !urlFound.contains(".ico")
+							&& !urlFound.contains(".png")
+							&& !urlFound.contains(".svg")
+							&& !urlFound.contains(".css")) {
+						urlsFound.add(urlFound);
+						urlsVisited.put(urlFound, false);
+					}
+				}
+			}
+			in.close();
+		} catch (IOException e) {
+			System.out.println(e.getMessage());
 		}
 	}
-	
-	//Method to get the domain name
-	public static String getDomainName(String url1) throws URISyntaxException {
-		String pattern = "^(?:[^/]+://)?([^/:]+)";
-		Matcher m = Pattern.compile(pattern).matcher(url1);
-		String host="";
-		if (m.find()) {
-			int start = m.start(1);
-			int end = m.end(1);
-			host = url1.substring(start, end);
+
+	// Extracts the domain from the given url
+	private static String getDomainName(String url) throws URISyntaxException {
+		String domainPattern = "^(?:[^/]+://)?([^/:]+)";
+		Matcher domainMatcher = Pattern.compile(domainPattern).matcher(url);
+		String host = "";
+		if (domainMatcher.find()) {
+			int start = domainMatcher.start(1);
+			int end = domainMatcher.end(1);
+			host = url.substring(start, end);
 		}
-		if(host == null)
+		if (host == null)
 			return "";
-	    return host.startsWith("www.") ? host.substring(4) : host;
+		return host.startsWith("www.") ? host.substring(4) : host;
 	}
-	
-	private static void startCrawling(String url) throws Exception{
-		crawling(url);
-		while(!allURLs.isEmpty()){
-			String nextURL = allURLs.poll();
-        	if(nextURL!=null && !visited.get(nextURL)){
-        		visited.put(nextURL, true);
-        		if (!nextURL.startsWith("http://")) {
-        			nextURL = "http://" + nextURL;
-        		}/*else if (!nextURL.startsWith("http://www.")) {
-        			nextURL = "http://www." + nextURL;
-        		}else if(url.startsWith("https://www.")){
-        			
-        		}*/
-        		crawling(nextURL);
-        	}
-        }
+
+	// Iterates through urls found in the provided site
+	private static void processSite(String url) throws Exception {
+		findUrlsAndEmailsOnSite(url);
+		maxPageDepth--;
+		while (true) {
+			int queueSize = urlsFound.size();
+			if (queueSize == 0 || maxPageDepth == 0)
+				break;
+			while (queueSize > 0 && maxPageDepth > 0) {
+				String nextURL = urlsFound.poll();
+				if (nextURL != null && !urlsVisited.get(nextURL)) {
+					urlsVisited.put(nextURL, true);
+					if (!nextURL.startsWith("http://")) {
+						nextURL = "http://" + nextURL;
+					}
+					findUrlsAndEmailsOnSite(nextURL);
+					queueSize--;
+				}
+			}
+			maxPageDepth--;
+		}
 	}
-	private static void startCrawlingDriver() throws Exception{
+
+	// Processes the url provided through user input
+	private static void crawlingDriver() throws Exception {
 		System.out.println("Enter a URL address:");
 		Scanner sc = new Scanner(System.in);
 		String url = sc.next();
-		 if (url.startsWith("www")) {
+		if (url.startsWith("www")) {
 			url = "http://" + url;
-		}
-		 else if (!url.startsWith("http://www")) {
+		} else if (!url.startsWith("http://www")) {
 			url = "http://www." + url;
+		} else if (url.startsWith("https://www.")) {
+			// do nothing
 		}
-		else if (url.startsWith("https://www.")) {
-			//do nothing
-		}
-		if(isValidURL(url)){
-			domainname = getDomainName(url);
+		if (isValidURL(url)) {
+			domainName = getDomainName(url);
 			System.out.println("Processing...This might take a while!");
-			startCrawling(url);
-			if(!emailIdFound.isEmpty())
+			processSite(url);
+			if (!emailsFound.isEmpty())
 				System.out.println("Found these email addresses:");
 			else
 				System.out.println("No Email Addresses found");
-			for(String email: emailIdFound)
+			for (String email : emailsFound)
 				System.out.println(email);
-		}
-		else{
-			System.out.println("Enter a valid URL with a protocol. For instance http://www.example.com");
+		} else {
+			System.out
+					.println("Enter a valid URL with a protocol. For instance http://www.example.com");
 		}
 	}
-	 public static boolean isValidURL(String url){
-        try {
-            new URL(url).toURI();
-            return true;
-        }catch (Exception e) {
-            return false;
-        }
-	 }
-	public static void main(String[] str) throws Exception{
-		startCrawlingDriver();	
+
+	// check if it is a valid URL
+	private static boolean isValidURL(String url) {
+		try {
+			new URL(url).toURI();
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	public static void main(String[] str) throws Exception {
+		crawlingDriver();
 	}
 }
-	
